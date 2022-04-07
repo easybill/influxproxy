@@ -1,17 +1,12 @@
 use axum::body::Bytes;
 use axum::extract::{Extension, Path};
-use axum::{
-    routing::{post},
-    Json, Router,
-};
+use axum::{routing::post, Json, Router};
 
 use serde_json::{json, Value};
-use tokio::sync::mpsc::{UnboundedSender, UnboundedReceiver};
-use tracing_subscriber::fmt::format;
-use std::collections::{hash_map, HashMap};
+use std::collections::HashMap;
 use std::net::SocketAddr;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 
@@ -34,7 +29,7 @@ pub struct Metric {
 
 #[derive(Debug)]
 pub struct AggregatedMetric {
-    org: String, 
+    org: String,
     bucket: String,
     data: Vec<String>,
 }
@@ -46,17 +41,13 @@ async fn main() -> ::anyhow::Result<(), ::anyhow::Error> {
 
     println!("{:?}", opt);
 
-    let (sender, receiver) = ::tokio::sync::mpsc::unbounded_channel::<Metric>(); 
+    let (sender, receiver) = ::tokio::sync::mpsc::unbounded_channel::<Metric>();
     let (agg_sender, agg_receiver) = ::tokio::sync::mpsc::unbounded_channel::<AggregatedMetric>();
-    
-    tokio::spawn(async move {
-        aggregate_metric_data(receiver, agg_sender).await
-    });
-    
+
+    tokio::spawn(async move { aggregate_metric_data(receiver, agg_sender).await });
+
     let opt2 = opt.clone();
-    tokio::spawn(async move {
-        send_data_to_influx(agg_receiver, opt2).await
-    });
+    tokio::spawn(async move { send_data_to_influx(agg_receiver, opt2).await });
 
     let app = Router::new()
         .route("/write/:org/:bucket", post(handler_write))
@@ -80,8 +71,8 @@ async fn handler_write(
     dbg!(&data);
     for metric in data {
         match sender.send(metric) {
-            Ok(()) => {},
-            Err(err) => println!("{}", &err)
+            Ok(()) => {}
+            Err(err) => println!("{}", &err),
         };
     }
     Json(json!({
@@ -92,25 +83,26 @@ async fn handler_write(
 fn extract_data(bucket: String, org: String, body: String) -> Vec<Metric> {
     body.split("\n")
         .map(|v| v.trim())
-        .map(|v| Metric{
+        .map(|v| Metric {
             data: v.to_string(),
             bucket: bucket.clone(),
             org: org.clone(),
-        }).collect()
+        })
+        .collect()
 }
 
-async fn aggregate_metric_data(mut receiver: UnboundedReceiver<Metric>, sender: UnboundedSender<AggregatedMetric>) -> Result<(), ::anyhow::Error> {
+async fn aggregate_metric_data(
+    mut receiver: UnboundedReceiver<Metric>,
+    sender: UnboundedSender<AggregatedMetric>,
+) -> Result<(), ::anyhow::Error> {
     let mut metrics: HashMap<(String, String), Vec<String>> = HashMap::new();
     loop {
         let sleep = tokio::time::sleep(Duration::from_secs(5));
         tokio::select! {
             _ = sleep => {
-                println!("world");
                 let mut metric_chunk: HashMap<(String, String), Vec<String>> = HashMap::new();
                 ::std::mem::swap(&mut metrics, &mut metric_chunk);
 
-                dbg!(&metric_chunk);
-                dbg!(&metrics);
                 for (key, value) in metric_chunk.into_iter() {
                     sender.send(AggregatedMetric { org: key.1, bucket: key.0, data: value })?;
                 }
@@ -128,36 +120,54 @@ async fn aggregate_metric_data(mut receiver: UnboundedReceiver<Metric>, sender: 
     }
 }
 
-async fn send_data_to_influx(mut receiver: UnboundedReceiver<AggregatedMetric>, opt: Opt) -> Result<(), ::anyhow::Error> {
-    let client = reqwest::Client::new();
+async fn send_data_to_influx(
+    mut receiver: UnboundedReceiver<AggregatedMetric>,
+    opt: Opt,
+) -> Result<(), ::anyhow::Error> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .connect_timeout(Duration::from_secs(10))
+        .build()?;
     loop {
         let metric = match receiver.recv().await {
             Some(s) => s,
-            None => continue
+            None => continue,
         };
-        println!(":)))");
 
         loop {
-            match client.post(format!("{}/api/v2/write?bucket={}&org={}&precision=s", opt.influx_endpoint, &metric.bucket, &metric.org))    
+            match client
+                .post(format!(
+                    "{}/api/v2/write?bucket={}&org={}&precision=s",
+                    opt.influx_endpoint, &metric.bucket, &metric.org
+                ))
                 .header("Authorization", format!("Token {}", opt.token))
                 .body(metric.data.join("\n").clone())
                 .send()
-                .await {
-                    Ok(response) if response.status() == 200 => {
-                        println!("Sent {} metrics to influx (org: {}, bucket: {})", metric.data.len(), metric.org, metric.bucket); 
-                        break;
-                    },
-                    Ok(response) => {
-                        println!("Unexpected response from influx database! {:#?}", response.status());
-                        ::tokio::time::sleep(Duration::from_secs(1)).await;
-                        continue;
-                    },
-                    Err(err) => {
-                        println!("Unable to send metric data: {}", err);
-                        ::tokio::time::sleep(Duration::from_secs(1)).await;
-                        continue;
-                    }
+                .await
+            {
+                Ok(response) if response.status() == 204 => {
+                    println!(
+                        "Sent {} metrics to influx (org: {}, bucket: {})",
+                        metric.data.len(),
+                        metric.org,
+                        metric.bucket
+                    );
+                    break;
                 }
+                Ok(response) => {
+                    println!(
+                        "Unexpected response from influx database! {:#?}",
+                        response.bytes().await
+                    );
+                    ::tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+                Err(err) => {
+                    println!("Unable to send metric data: {}", err);
+                    ::tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+            }
         }
     }
 }
