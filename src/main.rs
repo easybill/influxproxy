@@ -138,17 +138,23 @@ async fn send_data_to_influx(mut receiver: UnboundedReceiver<AggregatedMetric>, 
         println!(":)))");
 
         loop {
-            match client.post(format!("{}/api/v2/write?bucket={}&org={}&precision=ms", opt.influx_endpoint, &metric.bucket, &metric.org))
+            match client.post(format!("{}/api/v2/write?bucket={}&org={}&precision=s", opt.influx_endpoint, &metric.bucket, &metric.org))    
+                .header("Authorization", format!("Token {}", opt.token))
                 .body(metric.data.join("\n").clone())
                 .send()
                 .await {
-                    Ok(_) => {
-                        println!("Sent {} metrics to influx (org: {}, bucket: {})", metric.data.len(), metric.org, metric.bucket);
+                    Ok(response) if response.status() == 200 => {
+                        println!("Sent {} metrics to influx (org: {}, bucket: {})", metric.data.len(), metric.org, metric.bucket); 
                         break;
+                    },
+                    Ok(response) => {
+                        println!("Unexpected response from influx database! {:#?}", response.status());
+                        ::tokio::time::sleep(Duration::from_secs(1)).await;
+                        continue;
                     },
                     Err(err) => {
                         println!("Unable to send metric data: {}", err);
-                        ::tokio::time::sleep(Duration::from_secs(5)).await;
+                        ::tokio::time::sleep(Duration::from_secs(1)).await;
                         continue;
                     }
                 }
