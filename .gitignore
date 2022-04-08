@@ -1,2 +1,4 @@
 /target
 .idea/*
+/vendor/
+.DS_Store

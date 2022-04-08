@@ -1,0 +1,20 @@
+{
+    "name": "easybill/influxproxy",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "timglabisch",
+            "email": "glabisch@easybill.de"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Easybill\\Influxproxy\\": "client/php/src"
+        }
+    },
+    "require": {
+        "php": ">=8.0",
+        "ext-curl": "*"
+    }
+}
