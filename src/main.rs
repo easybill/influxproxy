@@ -98,15 +98,11 @@ async fn aggregate_metric_data(
 ) -> Result<(), ::anyhow::Error> {
     let mut metrics: HashMap<(String, String), Vec<String>> = HashMap::new();
     loop {
-        let sleep = tokio::time::sleep(Duration::from_secs(5));
+        let sleep = tokio::time::sleep(Duration::from_secs(1));
+        let mut wokeup = false;
         tokio::select! {
             _ = sleep => {
-                let mut metric_chunk: HashMap<(String, String), Vec<String>> = HashMap::new();
-                ::std::mem::swap(&mut metrics, &mut metric_chunk);
-
-                for (key, value) in metric_chunk.into_iter() {
-                    sender.send(AggregatedMetric { org: key.1, bucket: key.0, data: value })?;
-                }
+                wokeup = true;
             }
             raw_entry = receiver.recv() => {
                 let metric = match raw_entry {
@@ -118,6 +114,15 @@ async fn aggregate_metric_data(
                     .push(metric.data);
             }
         }
+
+        if wokeup || metrics.len() >= 300 {
+            let mut metric_chunk: HashMap<(String, String), Vec<String>> = HashMap::new();
+            ::std::mem::swap(&mut metrics, &mut metric_chunk);
+
+            for (key, value) in metric_chunk.into_iter() {
+                sender.send(AggregatedMetric { org: key.1, bucket: key.0, data: value })?;
+            }
+        }
     }
 }
 
@@ -126,7 +131,7 @@ async fn send_data_to_influx(
     opt: Opt,
 ) -> Result<(), ::anyhow::Error> {
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10))
         .build()?;
     loop {
