@@ -13,10 +13,11 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug, Clone)]
 #[structopt(name = "basic")]
 pub struct Opt {
+    #[structopt(env = "INFLUXPROXY_TOKEN")]
     token: String,
-    #[structopt(long = "bind", default_value = "0.0.0.0:3343")]
+    #[structopt(long = "bind", default_value = "0.0.0.0:3343", env = "INFLUXPROXY_BIND")]
     bind: String,
-    #[structopt(long = "influx_endpoint", default_value = "http://127.0.0.1:8086")]
+    #[structopt(long = "influx_endpoint", default_value = "http://127.0.0.1:8086", env = "INFLUXPROXY_ENDPOINT")]
     influx_endpoint: String,
 }
 
@@ -76,7 +77,7 @@ async fn handler_write(
         };
     }
     Json(json!({
-        "patrick": "ist doof, danke für die Pizza",
+        "success": true,
     }))
 }
 
