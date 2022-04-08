@@ -97,6 +97,7 @@ async fn aggregate_metric_data(
     sender: UnboundedSender<AggregatedMetric>,
 ) -> Result<(), ::anyhow::Error> {
     let mut metrics: HashMap<(String, String), Vec<String>> = HashMap::new();
+    let mut counter = 0;
     loop {
         let sleep = tokio::time::sleep(Duration::from_secs(1));
         let mut wokeup = false;
@@ -109,19 +110,23 @@ async fn aggregate_metric_data(
                     Some(metric) => metric,
                     None => continue
                 };
+                counter += 1;
+
                 metrics.entry((metric.bucket, metric.org))
                     .or_insert(vec![])
                     .push(metric.data);
             }
         }
 
-        if wokeup || metrics.len() >= 300 {
+        if wokeup || counter >= 300 {
             let mut metric_chunk: HashMap<(String, String), Vec<String>> = HashMap::new();
             ::std::mem::swap(&mut metrics, &mut metric_chunk);
 
             for (key, value) in metric_chunk.into_iter() {
                 sender.send(AggregatedMetric { org: key.1, bucket: key.0, data: value })?;
             }
+
+            counter = 0;
         }
     }
 }
