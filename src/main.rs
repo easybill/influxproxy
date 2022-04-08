@@ -135,6 +135,7 @@ async fn send_data_to_influx(
     mut receiver: UnboundedReceiver<AggregatedMetric>,
     opt: Opt,
 ) -> Result<(), ::anyhow::Error> {
+    let client_error_counter_max = 5;
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10))
@@ -146,6 +147,7 @@ async fn send_data_to_influx(
         };
 
         loop {
+            let mut client_error_counter = 0;
             match client
                 .post(format!(
                     "{}/api/v2/write?bucket={}&org={}&precision=s",
@@ -165,16 +167,36 @@ async fn send_data_to_influx(
                     );
                     break;
                 }
-                Ok(response) => {
-                    println!(
-                        "Unexpected response from influx database! {:#?}",
-                        response.bytes().await
+                Ok(response) if response.status().is_client_error() => {
+                    client_error_counter += 1;
+                    let content = response.bytes().await;
+                    eprintln!(
+                        "Unexpected client error from influx database! try {}/{} \n{:#?}",
+                        client_error_counter,
+                        client_error_counter_max,
+                        content
                     );
+
+                    // we can't do anything here. the data is probably broken and if we don't discard it, we can never move on.
+                    if client_error_counter >= client_error_counter_max {
+                        eprintln!("could not send metrics after {} tries. \n{}", client_error_counter_max, metric.data.join("\n").clone());
+                        break;
+                    }
+
+                    ::tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+                Ok(response) => {
+                    eprintln!(
+                        "Unexpected error from influx database! try {:#?}",
+                        response,
+                    );
+
                     ::tokio::time::sleep(Duration::from_secs(1)).await;
                     continue;
                 }
                 Err(err) => {
-                    println!("Unable to send metric data: {}", err);
+                    eprintln!("Unable to send metric data: {}", err);
                     ::tokio::time::sleep(Duration::from_secs(1)).await;
                     continue;
                 }
