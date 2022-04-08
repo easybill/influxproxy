@@ -21,8 +21,12 @@ class InfluxProxyPoint
         }
     }
 
-    private static function escape(string $v): string
+    private static function escape(mixed $v): mixed
     {
+        if (!is_string($v)) {
+            return $v;
+        }
+
         return addcslashes($v, ',= "\\');
     }
 
@@ -40,6 +44,6 @@ class InfluxProxyPoint
             $fields .= ',' . self::escape($k) . '=' . self::escape($v);
         }
 
-        return self::escape($this->measurement) . $tags . ' ' . $fields . ' ' . self::escape($this->timestamp);
+        return self::escape($this->measurement) . $tags . ' ' . ltrim($fields, ',') . ' ' . self::escape($this->timestamp);
     }
 }
