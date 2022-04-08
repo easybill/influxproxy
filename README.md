@@ -1,6 +1,6 @@
 # Influxproxy
 
-Influxproxy is a proxy for [InfluxDB].(https://github.com/influxdata/influxdb).
+Influxproxy is a proxy for [InfluxDB](https://github.com/influxdata/influxdb).
 
 ## Installation
 
