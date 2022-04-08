@@ -12,7 +12,7 @@ class InfluxProxyClient
     /** @throws InfluxProxySendException */
     public static function sendPoint(InfluxProxyConfig $config, InfluxProxyPoint $influxProxyPoint): void
     {
-        self::sendCurl($config, $influxProxyPoint->toLineProtocol());
+        self::sendRaw($config, $influxProxyPoint->toLineProtocol());
     }
 
     /**
@@ -22,13 +22,13 @@ class InfluxProxyClient
      */
     public static function sendPoints(InfluxProxyConfig $config, array $influxProxyPoints): void
     {
-        self::sendCurl(
+        self::sendRaw(
             $config,
             implode("\n", array_map(fn(InfluxProxyPoint $point) => $point->toLineProtocol(), $influxProxyPoints))
         );
     }
 
-    private static function sendCurl(InfluxProxyConfig $config, string $data): void
+    public static function sendRaw(InfluxProxyConfig $config, string $data): void
     {
         $ch = curl_init(rtrim($config->getEndpoint(), '/') . '/write/' . $config->getOrg() . '/' . $config->getBucket());
 
