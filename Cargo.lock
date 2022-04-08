@@ -391,7 +391,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "openssl-sys",
+ "openssl",
  "reqwest",
  "serde",
  "serde_derive",
