@@ -95,6 +95,7 @@ jobs:
         run: |
           cp binaries/influxproxy_ubuntu-latest_x86_64/influxproxy_ubuntu-latest_x86_64 influxproxy
           docker buildx build --platform linux/amd64 -t easybill/influxproxy:${{ steps.vars.outputs.tag }}_amd64 --push .
+          rm influxproxy
           cp binaries/influxproxy_ubuntu-latest_aarch64/influxproxy_ubuntu-latest_aarch64 influxproxy
           docker buildx build --platform linux/arm64 -t easybill/influxproxy:${{ steps.vars.outputs.tag }}_arm64 --push .
           docker manifest create easybill/influxproxy:${{ steps.vars.outputs.tag }} easybill/influxproxy:${{ steps.vars.outputs.tag }}_amd64 easybill/influxproxy:${{ steps.vars.outputs.tag }}_arm64
