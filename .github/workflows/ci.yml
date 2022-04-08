@@ -72,6 +72,7 @@ jobs:
       - name: Set output
         id: vars
         run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
+      - uses: actions/checkout@v2
       - name: download artifacts
         if: startsWith(github.ref, 'refs/tags/')
         uses: actions/download-artifact@v3
@@ -92,8 +93,6 @@ jobs:
         name: Build and push
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          ls binaries
-          ls binaries/influxproxy_ubuntu-latest_x86_64
           cp binaries/influxproxy_ubuntu-latest_x86_64/influxproxy_ubuntu-latest_x86_64 influxproxy
           docker buildx build --platform linux/amd64 -t easybill/influxproxy:${{ steps.vars.outputs.tag }}_amd64 --push .
           cp binaries/influxproxy_ubuntu-latest_aarch64/influxproxy_ubuntu-latest_aarch64 influxproxy
