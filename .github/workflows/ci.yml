@@ -92,10 +92,10 @@ jobs:
         name: Build and push
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          ls influxproxy_ubuntu-latest_x86_64
-          cp influxproxy_ubuntu-latest_x86_64/artifact/influxproxy_ubuntu-latest_x86_64 influxproxy
+          ls binaries
+          cp binaries/influxproxy_ubuntu-latest_x86_64/artifact/influxproxy_ubuntu-latest_x86_64 influxproxy
           docker buildx build --platform linux/amd64 -t easybill/influxproxy:${{ steps.vars.outputs.tag }}_amd64 --push .
-          cp influxproxy_ubuntu-latest_aarch64/artifact/influxproxy_ubuntu-latest_aarch64 influxproxy
+          cp binaries/influxproxy_ubuntu-latest_aarch64/artifact/influxproxy_ubuntu-latest_aarch64 influxproxy
           docker buildx build --platform linux/arm64 -t easybill/influxproxy:${{ steps.vars.outputs.tag }}_arm64 --push .
           docker manifest create easybill/influxproxy:${{ steps.vars.outputs.tag }} easybill/influxproxy:${{ steps.vars.outputs.tag }}_amd64 easybill/influxproxy:${{ steps.vars.outputs.tag }}_arm64
           docker manifest push easybill/influxproxy:${{ steps.vars.outputs.tag }}
