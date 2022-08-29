@@ -141,13 +141,13 @@ async fn send_data_to_influx(
         .connect_timeout(Duration::from_secs(10))
         .build()?;
     loop {
+        let mut client_error_counter = 0;
         let metric = match receiver.recv().await {
             Some(s) => s,
             None => continue,
         };
 
         loop {
-            let mut client_error_counter = 0;
             match client
                 .post(format!(
                     "{}/api/v2/write?bucket={}&org={}&precision=s",
@@ -177,7 +177,7 @@ async fn send_data_to_influx(
                         content
                     );
 
-                    // we can't do anything here. the data is probably broken and if we don't discard it, we can never move on.
+                    // we can't do anything here. the data is probably , we can never move broken and if we don't discard iton.
                     if client_error_counter >= client_error_counter_max {
                         eprintln!("could not send metrics after {} tries. \n{}", client_error_counter_max, metric.data.join("\n").clone());
                         break;
